@@ -38,7 +38,8 @@ class AndroidPlayInstallReferrerPlugin : FlutterPlugin, MethodCallHandler {
         this.context = flutterPluginBinding.applicationContext
         channel = MethodChannel(
             flutterPluginBinding.binaryMessenger,
-            "de.lschmierer.android_play_install_referrer")
+            "de.lschmierer.android_play_install_referrer"
+        )
         channel.setMethodCallHandler(this)
     }
 
@@ -65,7 +66,7 @@ class AndroidPlayInstallReferrerPlugin : FlutterPlugin, MethodCallHandler {
         } else {
             pendingResults.add(result)
 
-            if(!isInstallReferrerPending) {
+            if (!isInstallReferrerPending) {
                 referrerClient = InstallReferrerClient.newBuilder(context).build()
                 referrerClient?.startConnection(object : InstallReferrerStateListener {
                     override fun onInstallReferrerSetupFinished(responseCode: Int) {
@@ -83,28 +84,46 @@ class AndroidPlayInstallReferrerPlugin : FlutterPlugin, MethodCallHandler {
         when (responseCode) {
             InstallReferrerClient.InstallReferrerResponse.OK -> {
                 referrerClient?.let {
-                    referrerDetails = it.installReferrer
+                    try {
+                        referrerDetails = it.installReferrer
+                    } catch (e: android.os.DeadObjectException) {
+                        referrerError = Pair("BAD_STATE", "Result is null.")
+                    }
                 } ?: run {
                     referrerError = Pair("BAD_STATE", "Result is null.")
                 }
             }
+
             InstallReferrerClient.InstallReferrerResponse.SERVICE_DISCONNECTED -> {
-                referrerError = Pair("SERVICE_DISCONNECTED", "Play Store service is not connected now - potentially transient state.")
+                referrerError = Pair(
+                    "SERVICE_DISCONNECTED",
+                    "Play Store service is not connected now - potentially transient state."
+                )
             }
+
             InstallReferrerClient.InstallReferrerResponse.SERVICE_UNAVAILABLE -> {
                 referrerError = Pair("SERVICE_UNAVAILABLE", "Connection couldn't be established.")
             }
+
             InstallReferrerClient.InstallReferrerResponse.FEATURE_NOT_SUPPORTED -> {
-                referrerError = Pair("FEATURE_NOT_SUPPORTED", "API not available on the current Play Store app.")
+                referrerError = Pair(
+                    "FEATURE_NOT_SUPPORTED",
+                    "API not available on the current Play Store app."
+                )
             }
+
             InstallReferrerClient.InstallReferrerResponse.DEVELOPER_ERROR -> {
                 referrerError = Pair("DEVELOPER_ERROR", "General errors caused by incorrect usage.")
             }
+
             InstallReferrerClient.InstallReferrerResponse.PERMISSION_ERROR -> {
-                referrerError = Pair("PERMISSION_ERROR", "App is not allowed to bind to the Service.")
+                referrerError =
+                    Pair("PERMISSION_ERROR", "App is not allowed to bind to the Service.")
             }
+
             else -> {
-                referrerError = Pair("UNKNOWN_ERROR", "InstallReferrerClient returned unknown response code.")
+                referrerError =
+                    Pair("UNKNOWN_ERROR", "InstallReferrerClient returned unknown response code.")
             }
         }
 
