@@ -89,24 +89,19 @@ class AndroidPlayInstallReferrer {
       const MethodChannel('de.lschmierer.android_play_install_referrer');
 
   /// Get installation referrer details.
-  /// 
-  /// When an exception is thrown, it will return null.
-  /// Note it is disabled on iOS and Google Play Services are not available on Android.
-  static Future<ReferrerDetails?> get installReferrer async {
-    try {
-      final Map details = await _channel.invokeMethod('getInstallReferrer');
-  
-      return ReferrerDetails(
-        details['installReferrer'],
-        details['referrerClickTimestampSeconds'],
-        details['installBeginTimestampSeconds'],
-        details['referrerClickTimestampServerSeconds'],
-        details['installBeginTimestampServerSeconds'],
-        details['installVersion'],
-        details['googlePlayInstantParam'],
-      );
-    } catch (e) {
-      return null;
-    }
+  ///
+  /// Throws an exception on iOS and if Google Play Services are not available on Android.
+  static Future<ReferrerDetails> get installReferrer async {
+    final Map details = await _channel.invokeMethod('getInstallReferrer');
+
+    return ReferrerDetails(
+      details['installReferrer'],
+      details['referrerClickTimestampSeconds'],
+      details['installBeginTimestampSeconds'],
+      details['referrerClickTimestampServerSeconds'],
+      details['installBeginTimestampServerSeconds'],
+      details['installVersion'],
+      details['googlePlayInstantParam'],
+    );
   }
 }
