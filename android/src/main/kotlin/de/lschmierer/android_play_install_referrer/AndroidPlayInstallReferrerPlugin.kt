@@ -10,8 +10,8 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import android.os.RemoteException // Correct import
 import kotlin.collections.ArrayList
-
 
 /** AndroidPlayInstallReferrerPlugin */
 class AndroidPlayInstallReferrerPlugin : FlutterPlugin, MethodCallHandler {
@@ -49,7 +49,6 @@ class AndroidPlayInstallReferrerPlugin : FlutterPlugin, MethodCallHandler {
         } else {
             result.notImplemented()
         }
-
     }
 
     @Synchronized
@@ -83,14 +82,18 @@ class AndroidPlayInstallReferrerPlugin : FlutterPlugin, MethodCallHandler {
     private fun handleOnInstallReferrerSetupFinished(responseCode: Int) {
         when (responseCode) {
             InstallReferrerClient.InstallReferrerResponse.OK -> {
-                referrerClient?.let {
+                referrerClient?.let { client ->
                     try {
-                        referrerDetails = it.installReferrer
+                        referrerDetails = client.installReferrer
                     } catch (e: android.os.DeadObjectException) {
-                        referrerError = Pair("BAD_STATE", "Result is null.")
+                        referrerError = Pair("DEAD_OBJECT", "Service connection lost: ${e.message}")
+                    } catch (e: RemoteException) {
+                        referrerError = Pair("REMOTE_ERROR", "Remote service error: ${e.message}")
+                    } finally {
+                        client.endConnection() // Always close the connection
                     }
                 } ?: run {
-                    referrerError = Pair("BAD_STATE", "Result is null.")
+                    referrerError = Pair("BAD_STATE", "Referrer client is null.")
                 }
             }
 
@@ -128,7 +131,6 @@ class AndroidPlayInstallReferrerPlugin : FlutterPlugin, MethodCallHandler {
         }
 
         resolvePendingInstallReferrerResults()
-        referrerClient?.endConnection()
     }
 
     @Synchronized
@@ -141,16 +143,16 @@ class AndroidPlayInstallReferrerPlugin : FlutterPlugin, MethodCallHandler {
 
     @Synchronized
     private fun resolveInstallReferrerResult(@NonNull result: Result) {
-        referrerDetails?.let {
+        referrerDetails?.let { details ->
             result.success(
                 mapOf(
-                    "installReferrer" to it.installReferrer,
-                    "referrerClickTimestampSeconds" to it.referrerClickTimestampSeconds,
-                    "installBeginTimestampSeconds" to it.installBeginTimestampSeconds,
-                    "referrerClickTimestampServerSeconds" to it.referrerClickTimestampServerSeconds,
-                    "installBeginTimestampServerSeconds" to it.installBeginTimestampServerSeconds,
-                    "installVersion" to it.installVersion,
-                    "googlePlayInstantParam" to it.googlePlayInstantParam
+                    "installReferrer" to details.installReferrer,
+                    "referrerClickTimestampSeconds" to details.referrerClickTimestampSeconds,
+                    "installBeginTimestampSeconds" to details.installBeginTimestampSeconds,
+                    "referrerClickTimestampServerSeconds" to details.referrerClickTimestampServerSeconds,
+                    "installBeginTimestampServerSeconds" to details.installBeginTimestampServerSeconds,
+                    "installVersion" to details.installVersion,
+                    "googlePlayInstantParam" to details.googlePlayInstantParam
                 )
             )
             return
@@ -159,5 +161,6 @@ class AndroidPlayInstallReferrerPlugin : FlutterPlugin, MethodCallHandler {
             result.error(it.first, it.second, null)
             return
         }
+        result.error("UNKNOWN", "Unexpected null state", null) // Fallback for unexpected null state
     }
 }
